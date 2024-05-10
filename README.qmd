@@ -1,0 +1,80 @@
+---
+title: README
+author: James Day, a1820798
+date: today
+date-format: long
+format: 
+  html: 
+    self-contained: true
+    df-print: tibble
+editor_options: 
+  chunk_output_type: console
+execute: 
+  warning: false
+  message: false
+---
+
+```{r, echo = FALSE}
+pacman::p_load(targets)
+```
+
+The collaborator has provided raw data in movies.xlsx and would like to find which genre gives the best Christmas movies rating. To initially clean the data, rows without any genres recorded were removed and the data was restricted so that the title types were only movies (rather than tvMovies or videos). Movies with multiple genres were also split by genre into separate rows with duplicated ratings to ensure that only one genre corresponds to a rating. The modified dataset is given below.
+```{r}
+tar_load(movies_clean)
+movies_clean
+```
+
+To distinguish the effect of genre on average_ratings when the movie was a Christmas movie, the dataset was further restricted to only include Christmas movies as follows.
+```{r}
+tar_load(movies_christmas)
+movies_christmas
+```
+
+Sorting by the mean average_rating across each genres, the following table was produced for Christmas movies.
+```{r}
+tar_read(christmas_tab)
+```
+
+Similarly, the following table was produced for all movies.
+```{r}
+tar_read(movies_tab)
+```
+We can see that the top five genres for both tables are the same, albeit in slightly different orders: Documentary, Music, Biography, Film-Noir, and War. Since there are only two Film-Noir movies in the entire dataset and one in the Christmas movies dataset, we can omit Film-Noir from the table so that the fifth highest rated genre is Sci-Fi for Christmas movies and Animation for all movies. Sci-Fi is one of the few genres to drop significantly in the rankings when relaxing the restriction from Christmas to all movies. It would be desirable to quantitatively clarify the effects, if any, of Christmas movies on the relationship between genres and movie ratings.
+
+Linear models of increasingly complexity were fit to the unrestricted dataset 'movies_clean'. Put simply, MNull assumes no relationship between a movie's genres and its average_rating. M1 models the average_rating as dependent on the movie genre but not on whether or not it is a Christmas movie. M2 assumes that a Christmas movie will affect all movie ratings equally, regardless of genre. M3 assumes that the effect of a movie's genre on its average_rating is different for Christmas and non-Christmas movies.
+```{r}
+tar_load(MNull)
+summary(MNull)
+```
+
+```{r}
+tar_load(M1)
+summary(M1)
+plot(M1)
+```
+
+```{r}
+tar_load(M2)
+summary(M2)
+plot(M2)
+```
+
+```{r}
+tar_load(M3)
+summary(M3)
+plot(M3)
+```
+The diagnostic plots confirm that the assumption of linearity is reasonable for each model, since the residuals perturb randomly above and below the $y=0$ line in the Residuals vs Fitted plots. Referring to the Residuals vs Fitted plots, there is slight pinching of the residuals for large fitted values in each model, but this is most pronounced for model M3. Homoscedasticity seems reasonable for M1 and M2 but invalid for M3. In each Normal Q-Q plot, the standardised residual quantiles do not deviate significantly from theoretically normal quantiles. Hence, the assumption of normality is valid for all models.
+
+Since the response 'average_values' was duplicated in order to split the genres in 'movies_clean', there is perfect correlation between the duplicated datapoints. Hence, the assumption of independence between errors is not valid across the models and the results may be misleading. It would be more appropriate to fit a separate intercept for each movie in a mixed-effects model but, due to the low sample size of genres for each movie, it is unlikely that the model would converge fully and produce useful results.
+
+Proceeding regardless, the four linear models (including the null model) can be compared using Aikake's information criterion as follows.
+```{r}
+tar_read(movies_AIC)
+```
+Model M2 is preferred, since it minimises AIC (which corresponds to maximising likelihood while preventing overfitting). From the summary output for M2, we can see that Christmas movies reduce the average_rating of all movies by $\approx -0.49$, regardless of genre. According to this model, the best rated non-Christmas movie is a Documentary with an estimated rating of $\approx 7.59$. So, the best rated Christmas movie is also a Documentary but with an estimated rating of $\approx 7.1$. The second and third best rated Christmas movie genres are Biography and Film-Noir with estimated ratings of $\approx 6.7$ and $\approx 6.66$, respectively.
+
+We can test whether the interaction term between Christmas and genres is statistically significant. Since $p=0.5215>0.05$, we retain the null hypothesis that genres' effects on average_rating are not determined by whether or not the movie is a Christmas movie, at the 5% level of significance.
+```{r}
+tar_read(christmas_anova)
+```
